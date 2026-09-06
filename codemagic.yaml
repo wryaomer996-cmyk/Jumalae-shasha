@@ -7,12 +7,25 @@ workflows:
       node: 20
       java: 17
     scripts:
+      - name: Locate and Prepare Project
+        script: |
+          if [ ! -f "package.json" ] || ! grep -q '"build"' package.json 2>/dev/null; then
+            SUB_PKG=$(find . -maxdepth 3 -name "package.json" -not -path "*/node_modules/*" -exec grep -l '"build"' {} + | head -n 1)
+            if [ -n "$SUB_PKG" ]; then
+              SUB_DIR=$(dirname "$SUB_PKG")
+              echo "Found project files in $SUB_DIR, moving to root..."
+              cp -R "$SUB_DIR"/* .
+            fi
+          fi
+          if [ -f "package.json" ]; then
+            npm pkg set scripts.build="vite build" || true
+          fi
       - name: Install dependencies
         script: |
           npm ci --legacy-peer-deps || npm install --legacy-peer-deps
       - name: Build web assets
         script: |
-          npm run build
+          npm run build || npx --yes vite build
       - name: Setup Capacitor Android
         script: |
           npx cap add android || true
@@ -42,12 +55,25 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: Locate and Prepare Project
+        script: |
+          if [ ! -f "package.json" ] || ! grep -q '"build"' package.json 2>/dev/null; then
+            SUB_PKG=$(find . -maxdepth 3 -name "package.json" -not -path "*/node_modules/*" -exec grep -l '"build"' {} + | head -n 1)
+            if [ -n "$SUB_PKG" ]; then
+              SUB_DIR=$(dirname "$SUB_PKG")
+              echo "Found project files in $SUB_DIR, moving to root..."
+              cp -R "$SUB_DIR"/* .
+            fi
+          fi
+          if [ -f "package.json" ]; then
+            npm pkg set scripts.build="vite build" || true
+          fi
       - name: Install dependencies
         script: |
           npm ci --legacy-peer-deps || npm install --legacy-peer-deps
       - name: Build web assets
         script: |
-          npm run build
+          npm run build || npx --yes vite build
       - name: Setup Capacitor iOS
         script: |
           npx cap add ios || true
@@ -58,8 +84,9 @@ workflows:
           pod install || true
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath build || true
     artifacts:
-      - build/Build/Products/Debug-iphoneos/*.app
-      - build/Build/Products/Debug-iphoneos/*.ipa
+      - build/**/*.app
+      - build/**/*.ipa
+      - ios/App/build/**/*.ipa
     publishing:
       email:
         recipients:
